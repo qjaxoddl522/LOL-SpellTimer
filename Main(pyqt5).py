@@ -1,5 +1,7 @@
-from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
-from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtWidgets import QApplication, QDesktopWidget, QLabel, QVBoxLayout, QWidget, QPushButton
+from PyQt5.QtGui import QPixmap, QPixmapCache
+from PyQt5.QtCore import Qt, QUrl, QTimer
+from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
 import sys
 import RiotAPI, LCUAPI, DataDragon
 api_key = 'RGAPI-73aa5947-c143-402e-87a5-d242fca91837' #Riot API 키
@@ -7,8 +9,9 @@ api_key = 'RGAPI-73aa5947-c143-402e-87a5-d242fca91837' #Riot API 키
 #문제점: 적 챔피언 첫번째가 플레이어로 설정되는 현상
 
 #5명의 적 플레이어 정보
-#[챔피언, 스펠1, 스펠2, 우주적 통찰력 여부, 쿨감신 여부]
-enemyInfo = [{'champ':None, 'spell1':None, 'spell2':None, 'cosmic':False, 'ionia':False} for _ in range(5)]
+#[챔피언, 챔피언ID, 스펠1, 스펠2, 우주적 통찰력 여부, 쿨감신 여부]
+enemyInfo = [{'champ':None, 'champId':1, 'spell1':None, 'spell2':None, 'cosmic':False, 'ionia':False} for _ in range(5)]
+enemyInfo[2]['champId'] = 4
 enemyTeamStart = 0 #블루팀 레드팀 구분용도
 
 #기본 UI
@@ -65,6 +68,7 @@ class UI(QWidget):
                     self.findEnemyRune(name, tag, participants)
                     self.updateEnemyInfo()
                     print(*enemyInfo, sep='\n')
+                    self.overlay.updateUI(enemyInfo)
                     self.timer.stop()
                     return
             self.time = 1
@@ -90,7 +94,8 @@ class UI(QWidget):
         for i in range(enemyTeamStart, enemyTeamStart+5):
             for j in range(len(enemyInfo)):
                 #챔피언 id와 저장된 챔피언 정보가 같으면 같은 사람
-                if DataDragon.get_champion_name(participants[i]['championId']) == enemyInfo[j]['champ']:
+                if DataDragon.get_champion_name(participants[i]['championId'], 'ko_KR') == enemyInfo[j]['champ']:
+                    enemyInfo[j]['champId'] = participants[i]['championId']
                     #우주적 통찰력(8347)이 있으면 True
                     enemyInfo[j]['cosmic'] = (8347 in participants[i]['perks']['perkIds'])
                     break
@@ -114,6 +119,7 @@ class UI(QWidget):
                     for item in enemy['items']:
                         if item['itemID'] == 3158:
                             enemyInfo[i]['ionia'] = True
+                self.overlay.updateUI(enemyInfo)
             #else:
                 break
 
@@ -125,19 +131,59 @@ class OverlayUI(QWidget):
     def __init__(self):
         super().__init__()
 
+        self.setWindowTitle("오버레이")
+        self.setFixedSize(250, 250)
+        #위치 지정
+        screen = QDesktopWidget().screenGeometry()
+        self.move(screen.width() - 150, screen.height() - 650)
+        
         #레이아웃 지우기 및 오버레이 설정
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
 
-        self.label = QLabel("오버레이 UI", self)
-        self.label.setAlignment(Qt.AlignCenter)
+        #레이아웃 생성
+        self.layout = QVBoxLayout()
 
-        layout = QVBoxLayout()
-        layout.addWidget(self.label)
+        self.updateUI(enemyInfo)
 
-        self.setLayout(layout)
+    #UI 배치 겸 업데이트
+    def updateUI(self, enemyInfo):
+        #기존 위젯 제거
+        for i in reversed(range(self.layout.count())): 
+            self.layout.itemAt(i).widget().setParent(None)
+        
+        #이미지 넣고 레이아웃에 배치
+        for i in range(len(enemyInfo)):
+            label = QLabel(self)
+            self.layout.addWidget(label)
 
-        self.setFixedSize(300, 100)
+            url = DataDragon.get_champion_imageURL(enemyInfo[i]['champId'])
+            pixmap = QPixmapCache.find(url)
+            #이미지가 캐시에 없으면 다운로드
+            if pixmap == None:
+                manager = QNetworkAccessManager(self)
+                manager.finished.connect(lambda reply, u=url, l=label:self.handleFinished(reply, u, l))
+                manager.get(QNetworkRequest(QUrl(url)))
+            #이미지가 캐시에 있으면 사용
+            else:
+                label.setPixmap(pixmap)
+        self.setLayout(self.layout)
+
+    #설정 종료 후 이미지 불러오기
+    def handleFinished(self, reply, url, label):
+        data = reply.readAll()
+        pixmap = QPixmap()
+        pixmap.loadFromData(data)
+
+        #이미지 크기 조절
+        pixmap = pixmap.scaled(40, 40, Qt.KeepAspectRatio)
+
+        #라벨에 이미지 설정
+        label.setPixmap(pixmap)
+
+        #이미지 캐시에 저장
+        QPixmapCache.insert(url, pixmap)
+
         self.show()
 
 if __name__ == '__main__':

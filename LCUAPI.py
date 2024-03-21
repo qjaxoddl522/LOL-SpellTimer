@@ -1,6 +1,7 @@
 import requests
 
-url = "https://127.0.0.1:2999/liveclientdata/allgamedata"  #롤 클라이언트의 실시간 게임 데이터를 가져오는 API URL
+#롤 클라이언트의 실시간 게임 데이터를 가져오는 API URL
+url = "https://127.0.0.1:2999/liveclientdata/allgamedata"
 headers = {"Accept": "application/json"}
 
 requests.packages.urllib3.disable_warnings() #경고 메시지 비활성화
@@ -10,8 +11,7 @@ def checkIngame():
         response = requests.get(url, headers=headers, verify=False)
         if response.status_code == 200:
             game_data = response.json()
-            #players = game_data['allPlayers'] #플레이어들의 정보 딕셔너리
-            return game_data#['activePlayer']['summonerName']
+            return game_data
         else:
             return None
     except requests.exceptions.ConnectionError:

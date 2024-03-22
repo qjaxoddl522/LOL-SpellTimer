@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QApplication, QDesktopWidget, QLabel, QHBoxLayout, Q
 from PyQt5.QtGui import QPixmap, QPixmapCache, QCursor
 from PyQt5.QtCore import Qt, QUrl, QTimer, QSize
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
-import sys
+import sys, threading
 import RiotAPI, LCUAPI, DataDragon
 api_key = 'RGAPI-73aa5947-c143-402e-87a5-d242fca91837' #Riot API 키
 
@@ -46,37 +46,39 @@ class UI(QWidget):
         #타이머가 시간마다 실행할 함수 설정
         self.timer.timeout.connect(self.startGame)
         self.timer.start()
-
+        
     def startGame(self): #UI텍스트 업데이트
         global enemyTeamStart
         if self.time == 3:
-            gameData = LCUAPI.checkIngame() #게임을 인식 못하면 None 반환
-            if gameData != None:
-                name, tag = gameData['activePlayer']['summonerName'].split('#')
-                participants = RiotAPI.get_info(api_key, name, tag)
-                if participants != None and len(participants): #RiotAPI 게임 찾음
-                    
-                    #enemyTeamStart 찾기
-                    for participant in participants:
-                        if participant['riotId'] == f"{name}#{tag}": #현재 participant가 플레이어
-                            #teamId가 100이면 상대는 레드팀
-                            enemyTeamStart = 5 if participant['teamId'] == 100 else 0
-                            break
-                    
-                    self.label.setText("게임을 찾았습니다!")
-                    self.findEnemyInfo(gameData)
-                    self.findEnemyRune(name, tag, participants)
-                    self.updateEnemyInfo()
-                    print(*enemyInfo, sep='\n')
-                    self.overlay.updateUI(enemyInfo)
-                    self.timer.stop()
-                    return
+            threading.Thread(target=self.checkGameData).start()
             self.time = 1
         else:
             self.time += 1
         #텍스트 업데이트
         self.label.setText("게임을 찾는 중"+(self.time*"."))
 
+    def checkGameData(self):
+        gameData = LCUAPI.checkIngame() #게임을 인식 못하면 None 반환
+        if gameData != None:
+            name, tag = gameData['activePlayer']['summonerName'].split('#')
+            participants = RiotAPI.get_info(api_key, name, tag)
+            if participants != None and len(participants): #RiotAPI 게임 찾음
+                
+                #enemyTeamStart 찾기
+                for participant in participants:
+                    if participant['riotId'] == f"{name}#{tag}": #현재 participant가 플레이어
+                        #teamId가 100이면 상대는 레드팀
+                        enemyTeamStart = 5 if participant['teamId'] == 100 else 0
+                        break
+
+                self.timer.stop()
+                self.label.setText("게임을 찾았습니다!")
+                self.findEnemyInfo(gameData)
+                self.findEnemyRune(name, tag, participants)
+                self.updateEnemyInfo()
+                print(*enemyInfo, sep='\n')
+                self.overlay.updateUI(enemyInfo)
+    
     def findEnemyInfo(self, gameData): #최초 적 정보 채우기
         global enemyTeamStart
         players = gameData['allPlayers']
@@ -102,26 +104,23 @@ class UI(QWidget):
 
     def updateEnemyInfo(self): #적 정보 갱신
         global enemyTeamStart
-        while True:
-            gameData = LCUAPI.checkIngame()
-            if gameData != None:
-                players = gameData['allPlayers']
-                #챔피언 순서 갱신
-                for i, enemy1 in enumerate(players[enemyTeamStart : enemyTeamStart+5]):
-                    if enemyInfo[i]['champ'] != enemy1['championName']:
-                        for j, enemy2 in enumerate(players[enemyTeamStart : enemyTeamStart+5]):
-                            if enemyInfo[i]['champ'] == enemy2['championName']:
-                                enemyInfo[i], enemyInfo[j] = enemyInfo[j], enemyInfo[i]
-                #적 정보 갱신 
-                for i, enemy in enumerate(players[enemyTeamStart : enemyTeamStart+5]):
-                    enemyInfo[i]['spell1'] = enemy['summonerSpells']['summonerSpellOne']['displayName']
-                    enemyInfo[i]['spell2'] = enemy['summonerSpells']['summonerSpellTwo']['displayName']
-                    for item in enemy['items']:
-                        if item['itemID'] == 3158:
-                            enemyInfo[i]['ionia'] = True
-                self.overlay.updateUI(enemyInfo)
-            #else:
-                break
+        gameData = LCUAPI.checkIngame()
+        if gameData != None:
+            players = gameData['allPlayers']
+            #챔피언 순서 갱신
+            for i, enemy1 in enumerate(players[enemyTeamStart : enemyTeamStart+5]):
+                if enemyInfo[i]['champ'] != enemy1['championName']:
+                    for j, enemy2 in enumerate(players[enemyTeamStart : enemyTeamStart+5]):
+                        if enemyInfo[i]['champ'] == enemy2['championName']:
+                            enemyInfo[i], enemyInfo[j] = enemyInfo[j], enemyInfo[i]
+            #적 정보 갱신 
+            for i, enemy in enumerate(players[enemyTeamStart : enemyTeamStart+5]):
+                enemyInfo[i]['spell1'] = enemy['summonerSpells']['summonerSpellOne']['displayName']
+                enemyInfo[i]['spell2'] = enemy['summonerSpells']['summonerSpellTwo']['displayName']
+                for item in enemy['items']:
+                    if item['itemID'] == 3158:
+                        enemyInfo[i]['ionia'] = True
+            self.overlay.updateUI(enemyInfo)
 
     def closeEvent(self, event):
         self.overlay.close()

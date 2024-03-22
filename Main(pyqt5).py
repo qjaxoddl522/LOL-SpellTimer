@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QApplication, QDesktopWidget, QLabel, QVBoxLayout, QWidget, QPushButton
-from PyQt5.QtGui import QPixmap, QPixmapCache
-from PyQt5.QtCore import Qt, QUrl, QTimer
+from PyQt5.QtWidgets import QApplication, QDesktopWidget, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QStackedLayout
+from PyQt5.QtGui import QPixmap, QPixmapCache, QCursor
+from PyQt5.QtCore import Qt, QUrl, QTimer, QSize
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
 import sys
 import RiotAPI, LCUAPI, DataDragon
@@ -10,7 +10,7 @@ api_key = 'RGAPI-73aa5947-c143-402e-87a5-d242fca91837' #Riot API 키
 
 #5명의 적 플레이어 정보
 #[챔피언, 챔피언ID, 스펠1, 스펠2, 우주적 통찰력 여부, 쿨감신 여부]
-enemyInfo = [{'champ':None, 'champId':1, 'spell1':None, 'spell2':None, 'cosmic':False, 'ionia':False} for _ in range(5)]
+enemyInfo = [{'champ':None, 'champId':1, 'spell1':'점멸', 'spell2':'점화', 'cosmic':False, 'ionia':False} for _ in range(5)]
 enemyInfo[2]['champId'] = 4
 enemyTeamStart = 0 #블루팀 레드팀 구분용도
 
@@ -21,6 +21,10 @@ class UI(QWidget):
 
         self.overlay = overlay
 
+        # 창 설정
+        self.setWindowTitle("롤 스펠타이머")
+        self.setFixedSize(300, 100) # 창 크기 고정
+        
         self.time = 1
         self.label = QLabel("게임을 찾는 중"+(self.time*"."), self) #위젯 생성
         self.label.setAlignment(Qt.AlignCenter) #라벨 위치 설정
@@ -34,10 +38,6 @@ class UI(QWidget):
         layout.addWidget(self.label)
         
         self.setLayout(layout)
-
-        # 창 설정
-        self.setWindowTitle("롤 스펠타이머")
-        self.setFixedSize(300, 100) # 창 크기 고정
         self.show()
 
         self.timer = QTimer(self)
@@ -130,33 +130,47 @@ class UI(QWidget):
 class OverlayUI(QWidget):
     def __init__(self):
         super().__init__()
-
+        
         self.setWindowTitle("오버레이")
-        self.setFixedSize(250, 250)
+        self.setFixedSize(135, 200)
+        self.setStyleSheet("background-color: rgba(127, 127, 127, 255);")
+        
         #위치 지정
         screen = QDesktopWidget().screenGeometry()
-        self.move(screen.width() - 150, screen.height() - 650)
+        self.move(screen.width() - 155, screen.height() - 650)
         
         #레이아웃 지우기 및 오버레이 설정
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
-        self.setAttribute(Qt.WA_TranslucentBackground)
+        #self.setAttribute(Qt.WA_TranslucentBackground) #배경지우기
 
-        #레이아웃 생성
+        #수직 레이아웃 생성
         self.layout = QVBoxLayout()
-
+        #배경을 채우기 위한 간격 제거
+        self.layout.setContentsMargins(5, 0, 5, 0) #왼, 위, 오, 아래
+        self.layout.setSpacing(0)
+        
         self.updateUI(enemyInfo)
+
+        #마우스 이벤트
+        self.mFlag = False #드래그용 마우스 클릭 확인
+        self.mPosition = 0, 0
 
     #UI 배치 겸 업데이트
     def updateUI(self, enemyInfo):
         #기존 위젯 제거
         for i in reversed(range(self.layout.count())): 
             self.layout.itemAt(i).widget().setParent(None)
-        
+
         #이미지 넣고 레이아웃에 배치
         for i in range(len(enemyInfo)):
-            label = QLabel(self)
-            self.layout.addWidget(label)
+            #수평 레이아웃(개인용)
+            layoutChampion = QHBoxLayout()
+            layoutChampion.setSpacing(10)
 
+            #챔피언 이미지 라벨
+            label = QLabel(self)
+            layoutChampion.addWidget(label)
+            
             url = DataDragon.get_champion_imageURL(enemyInfo[i]['champId'])
             pixmap = QPixmapCache.find(url)
             #이미지가 캐시에 없으면 다운로드
@@ -167,16 +181,35 @@ class OverlayUI(QWidget):
             #이미지가 캐시에 있으면 사용
             else:
                 label.setPixmap(pixmap)
+            
+            #스펠1 버튼
+            buttonSpell1 = QPushButton(self)
+            layoutChampion.addWidget(buttonSpell1)
+            #버튼에 이미지 설정
+            buttonSpell1.setStyleSheet("QPushButton {{border-image: url(spell/{0});}}".format(enemyInfo[i]['spell1']))
+            #버튼 크기 설정
+            buttonSpell1.setFixedSize(QSize(35, 35))
+            
+            #스펠2 버튼
+            buttonSpell2 = QPushButton(self)
+            layoutChampion.addWidget(buttonSpell2)
+            #버튼에 이미지 설정
+            buttonSpell2.setStyleSheet("QPushButton {{border-image: url(spell/{0});}}".format(enemyInfo[i]['spell2']))
+            #버튼 크기 설정
+            buttonSpell2.setFixedSize(QSize(35, 35))
+            
+            self.layout.addLayout(layoutChampion)
         self.setLayout(self.layout)
-
-    #설정 종료 후 이미지 불러오기
+        self.show()
+    
+    #설정 후 이미지 불러오기
     def handleFinished(self, reply, url, label):
         data = reply.readAll()
         pixmap = QPixmap()
         pixmap.loadFromData(data)
 
         #이미지 크기 조절
-        pixmap = pixmap.scaled(40, 40, Qt.KeepAspectRatio)
+        pixmap = pixmap.scaled(35, 35, Qt.KeepAspectRatio)
 
         #라벨에 이미지 설정
         label.setPixmap(pixmap)
@@ -184,7 +217,19 @@ class OverlayUI(QWidget):
         #이미지 캐시에 저장
         QPixmapCache.insert(url, pixmap)
 
-        self.show()
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.mFlag = True
+            self.mPosition = event.globalPos() - self.pos() #마우스 위치 저장
+            self.setCursor(QCursor(Qt.OpenHandCursor)) #마우스 커서 변경
+
+    def mouseMoveEvent(self, event):
+        if Qt.LeftButton and self.mFlag:
+            self.move(event.globalPos() - self.mPosition) #창 위치 이동
+
+    def mouseReleaseEvent(self, event):
+        self.mFlag = False
+        self.setCursor(QCursor(Qt.ArrowCursor)) #마우스 커서 변경
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

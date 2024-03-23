@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QApplication, QDesktopWidget, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QStackedLayout
-from PyQt5.QtGui import QPixmap, QPixmapCache, QCursor
+from PyQt5.QtGui import QPixmap, QPixmapCache, QCursor, QPainter, QColor
 from PyQt5.QtCore import Qt, QUrl, QTimer, QSize
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
 import sys, threading
@@ -12,6 +12,7 @@ api_key = 'RGAPI-73aa5947-c143-402e-87a5-d242fca91837' #Riot API 키
 #[챔피언, 챔피언ID, 스펠1, 스펠2, 우주적 통찰력 여부, 쿨감신 여부]
 enemyInfo = [{'champ':None, 'champId':1, 'spell1':'점멸', 'spell2':'점화', 'cosmic':False, 'ionia':False} for _ in range(5)]
 enemyInfo[2]['champId'] = 4
+enemyInfo[2]['spell2'] = '유체화'
 enemyTeamStart = 0 #블루팀 레드팀 구분용도
 
 #기본 UI
@@ -125,6 +126,7 @@ class UI(QWidget):
     def closeEvent(self, event):
         self.overlay.close()
 
+overlayUISize = 35 #UI 길이
 #오버레이 UI
 class OverlayUI(QWidget):
     def __init__(self):
@@ -187,7 +189,9 @@ class OverlayUI(QWidget):
             #버튼에 이미지 설정
             buttonSpell1.setStyleSheet("QPushButton {{border-image: url(spell/{0});}}".format(enemyInfo[i]['spell1']))
             #버튼 크기 설정
-            buttonSpell1.setFixedSize(QSize(35, 35))
+            buttonSpell1.setFixedSize(QSize(overlayUISize, overlayUISize))
+            #버튼 클릭
+            buttonSpell1.clicked.connect(lambda trash=False, i=i : self.onButtonClicked(i, '1'))
             
             #스펠2 버튼
             buttonSpell2 = QPushButton(self)
@@ -195,7 +199,9 @@ class OverlayUI(QWidget):
             #버튼에 이미지 설정
             buttonSpell2.setStyleSheet("QPushButton {{border-image: url(spell/{0});}}".format(enemyInfo[i]['spell2']))
             #버튼 크기 설정
-            buttonSpell2.setFixedSize(QSize(35, 35))
+            buttonSpell2.setFixedSize(QSize(overlayUISize, overlayUISize))
+            #버튼 클릭
+            buttonSpell2.clicked.connect(lambda trash=False, i=i : self.onButtonClicked(i, '2'))
             
             self.layout.addLayout(layoutChampion)
         self.setLayout(self.layout)
@@ -208,13 +214,19 @@ class OverlayUI(QWidget):
         pixmap.loadFromData(data)
 
         #이미지 크기 조절
-        pixmap = pixmap.scaled(35, 35, Qt.KeepAspectRatio)
+        pixmap = pixmap.scaled(overlayUISize, overlayUISize, Qt.KeepAspectRatio)
 
         #라벨에 이미지 설정
         label.setPixmap(pixmap)
 
         #이미지 캐시에 저장
         QPixmapCache.insert(url, pixmap)
+
+    #버튼 클릭
+    def onButtonClicked(self, player, spellNum): #(오버레이 객체, 버튼 객체, 적 번호, 스펠 번호)
+        btn = self.sender()
+        btn.setStyleSheet("QPushButton {{border-image: url(spell/{0}CT); Color: white}}".format(enemyInfo[player]['spell'+spellNum]))
+        btn.setText('5:00')
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:

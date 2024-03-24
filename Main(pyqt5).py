@@ -1,6 +1,6 @@
-from PyQt5.QtWidgets import QApplication, QDesktopWidget, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QPushButton, QStackedLayout
+from PyQt5.QtWidgets import QApplication, QDesktopWidget, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QPushButton
 from PyQt5.QtGui import QPixmap, QPixmapCache, QCursor, QPainter, QColor
-from PyQt5.QtCore import Qt, QUrl, QTimer, QSize
+from PyQt5.QtCore import Qt, QUrl, QTimer, QSize, pyqtSignal, pyqtSlot
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
 import sys, threading
 import RiotAPI, LCUAPI, DataDragon
@@ -10,7 +10,7 @@ api_key = 'RGAPI-73aa5947-c143-402e-87a5-d242fca91837' #Riot API 키
 
 #5명의 적 플레이어 정보
 #[챔피언, 챔피언ID, 스펠1, 스펠2, 우주적 통찰력 여부, 쿨감신 여부]
-enemyInfo = [{'champ':None, 'champId':1, 'spell1':'점멸', 'spell2':'점화', 'cosmic':False, 'ionia':False} for _ in range(5)]
+enemyInfo = [{'champ':None, 'champId':1, 'spell1':'점멸', 'spell2':'점화', 'spell1CT':0, 'spell2CT':0, 'cosmic':False, 'ionia':False} for _ in range(5)]
 enemyInfo[2]['champId'] = 4
 enemyInfo[2]['spell2'] = '유체화'
 enemyTeamStart = 0 #블루팀 레드팀 구분용도
@@ -51,6 +51,9 @@ class UI(QWidget):
     def startGame(self): #UI텍스트 업데이트
         global enemyTeamStart
         if self.time == 3:
+            enemyInfo[2], enemyInfo[3] = enemyInfo[3], enemyInfo[2]
+            self.overlay.signalUI.emit()
+            self.overlay.show()
             threading.Thread(target=self.checkGameData).start()
             self.time = 1
         else:
@@ -78,7 +81,6 @@ class UI(QWidget):
                 self.findEnemyRune(name, tag, participants)
                 self.updateEnemyInfo()
                 print(*enemyInfo, sep='\n')
-                self.overlay.updateUI(enemyInfo)
     
     def findEnemyInfo(self, gameData): #최초 적 정보 채우기
         global enemyTeamStart
@@ -121,14 +123,16 @@ class UI(QWidget):
                 for item in enemy['items']:
                     if item['itemID'] == 3158:
                         enemyInfo[i]['ionia'] = True
-            self.overlay.updateUI(enemyInfo)
 
     def closeEvent(self, event):
         self.overlay.close()
+        self.timer.stop()
 
-overlayUISize = 35 #UI 길이
+overlayUISize = 35 #아이콘UI 길이
 #오버레이 UI
 class OverlayUI(QWidget):
+    signalUI = pyqtSignal()
+    
     def __init__(self):
         super().__init__()
         
@@ -143,69 +147,75 @@ class OverlayUI(QWidget):
         #레이아웃 지우기 및 오버레이 설정
         self.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
         #self.setAttribute(Qt.WA_TranslucentBackground) #배경지우기
-
-        #수직 레이아웃 생성
-        self.layout = QVBoxLayout()
-        #배경을 채우기 위한 간격 제거
-        self.layout.setContentsMargins(5, 0, 5, 0) #왼, 위, 오, 아래
-        self.layout.setSpacing(0)
         
-        self.updateUI(enemyInfo)
+        self.initUI()
+        self.signalUI.connect(self.refreshUI)
 
         #마우스 이벤트
         self.mFlag = False #드래그용 마우스 클릭 확인
         self.mPosition = 0, 0
 
-    #UI 배치 겸 업데이트
-    def updateUI(self, enemyInfo):
-        #기존 위젯 제거
-        for i in reversed(range(self.layout.count())): 
-            self.layout.itemAt(i).widget().setParent(None)
+    #UI 초기 생성
+    def initUI(self):
+        #수직 레이아웃 생성
+        self.layout = QVBoxLayout()
+        #배경을 채우기 위한 간격 제거
+        self.layout.setContentsMargins(5, 0, 5, 0) #왼, 위, 오, 아래
+        self.layout.setSpacing(0)
 
-        #이미지 넣고 레이아웃에 배치
+        #각 위젯 생성
+        self.layoutChampion = [QHBoxLayout() for _ in range(len(enemyInfo))]
+        self.imageLabel = [QLabel(self) for _ in range(len(enemyInfo))]
+        self.buttonSpell1 = [QPushButton(self) for _ in range(len(enemyInfo))]
+        self.buttonSpell2 = [QPushButton(self) for _ in range(len(enemyInfo))]
+        
+        #레이아웃에 배치
         for i in range(len(enemyInfo)):
             #수평 레이아웃(개인용)
-            layoutChampion = QHBoxLayout()
-            layoutChampion.setSpacing(10)
+            self.layoutChampion[i].setSpacing(10)
 
             #챔피언 이미지 라벨
-            label = QLabel(self)
-            layoutChampion.addWidget(label)
+            self.layoutChampion[i].addWidget(self.imageLabel[i])
+
+            #스펠1 버튼
+            self.layoutChampion[i].addWidget(self.buttonSpell1[i])
+            #버튼 크기 설정
+            self.buttonSpell1[i].setFixedSize(QSize(overlayUISize, overlayUISize))
+            #버튼 클릭
+            self.buttonSpell1[i].clicked.connect(lambda trash=False, i=i : self.onButtonClicked(i, '1'))
             
+            #스펠2 버튼
+            self.layoutChampion[i].addWidget(self.buttonSpell2[i])
+            #버튼 크기 설정
+            self.buttonSpell2[i].setFixedSize(QSize(overlayUISize, overlayUISize))
+            #버튼 클릭
+            self.buttonSpell2[i].clicked.connect(lambda trash=False, i=i : self.onButtonClicked(i, '2'))
+            
+            self.layout.addLayout(self.layoutChampion[i])
+        self.setLayout(self.layout)
+
+    #UI 새로고침
+    @pyqtSlot()
+    def refreshUI(self):
+        for i in range(len(enemyInfo)):
             url = DataDragon.get_champion_imageURL(enemyInfo[i]['champId'])
             pixmap = QPixmapCache.find(url)
             #이미지가 캐시에 없으면 다운로드
             if pixmap == None:
                 manager = QNetworkAccessManager(self)
-                manager.finished.connect(lambda reply, u=url, l=label:self.handleFinished(reply, u, l))
+                manager.finished.connect(lambda reply, u=url, l=self.imageLabel[i] : self.handleFinished(reply, u, l))
                 manager.get(QNetworkRequest(QUrl(url)))
             #이미지가 캐시에 있으면 사용
             else:
-                label.setPixmap(pixmap)
-            
-            #스펠1 버튼
-            buttonSpell1 = QPushButton(self)
-            layoutChampion.addWidget(buttonSpell1)
-            #버튼에 이미지 설정
-            buttonSpell1.setStyleSheet("QPushButton {{border-image: url(spell/{0});}}".format(enemyInfo[i]['spell1']))
-            #버튼 크기 설정
-            buttonSpell1.setFixedSize(QSize(overlayUISize, overlayUISize))
-            #버튼 클릭
-            buttonSpell1.clicked.connect(lambda trash=False, i=i : self.onButtonClicked(i, '1'))
-            
-            #스펠2 버튼
-            buttonSpell2 = QPushButton(self)
-            layoutChampion.addWidget(buttonSpell2)
-            #버튼에 이미지 설정
-            buttonSpell2.setStyleSheet("QPushButton {{border-image: url(spell/{0});}}".format(enemyInfo[i]['spell2']))
-            #버튼 크기 설정
-            buttonSpell2.setFixedSize(QSize(overlayUISize, overlayUISize))
-            #버튼 클릭
-            buttonSpell2.clicked.connect(lambda trash=False, i=i : self.onButtonClicked(i, '2'))
-            
-            self.layout.addLayout(layoutChampion)
-        self.setLayout(self.layout)
-        self.show()
+                self.imageLabel[i].setPixmap(pixmap)
+
+            #버튼 이미지 설정
+            imgName = enemyInfo[i]['spell1'] + ('CT' if enemyInfo[i]['spell1CT'] > 0 else '')
+            self.buttonSpell1[i].setStyleSheet("QPushButton {{border-image: url(spell/{0});}}".format(imgName))
+
+            #버튼 이미지 설정
+            imgName = enemyInfo[i]['spell2'] + ('CT' if enemyInfo[i]['spell2CT'] > 0 else '')
+            self.buttonSpell2[i].setStyleSheet("QPushButton {{border-image: url(spell/{0});}}".format(imgName))
     
     #설정 후 이미지 불러오기
     def handleFinished(self, reply, url, label):
@@ -223,10 +233,11 @@ class OverlayUI(QWidget):
         QPixmapCache.insert(url, pixmap)
 
     #버튼 클릭
-    def onButtonClicked(self, player, spellNum): #(오버레이 객체, 버튼 객체, 적 번호, 스펠 번호)
+    def onButtonClicked(self, player, spellNum): #(오버레이 객체, 적 번호, 스펠 번호)
         btn = self.sender()
-        btn.setStyleSheet("QPushButton {{border-image: url(spell/{0}CT); Color: white}}".format(enemyInfo[player]['spell'+spellNum]))
-        btn.setText('5:00')
+        btn.setStyleSheet("QPushButton {{border-image: url(spell/{0}CT);}}".format(enemyInfo[player]['spell'+spellNum]))
+        enemyInfo[player]['spell'+spellNum+'CT'] = DataDragon.get_spell_cooltime(enemyInfo[player]['spell'+spellNum])
+        #btn.setText('5:00')
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:

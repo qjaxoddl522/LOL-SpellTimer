@@ -24,8 +24,40 @@ def get_champion_imageURL(championId):
     url = f"https://ddragon.leagueoflegends.com/cdn/{version}/img/champion/{championName}.png"
     return url
 
+def get_spell_cooltime(spell):
+    version = get_latest_version()
+    url = f"https://ddragon.leagueoflegends.com/cdn/{version}/data/en_US/summoner.json"
+    response = requests.get(url)
+    data = response.json()['data']
+
+    spellName = None
+    if spell == '방어막':
+        spellName = 'SummonerBarrier'
+    elif spell == '정화':
+        spellName = 'SummonerBoost'
+    elif spell == '점화':
+        spellName = 'SummonerDot'
+    elif spell == '탈진':
+        spellName = 'SummonerExhaust'
+    elif spell == '점멸':
+        spellName = 'SummonerFlash'
+    elif spell == '유체화':
+        spellName = 'SummonerHaste'
+    elif spell == '회복':
+        spellName = 'SummonerHeal'
+    elif spell == '총명':
+        spellName = 'SummonerMana'
+    elif spell == '강타':
+        spellName = 'SummonerSmite'
+    elif spell == '표식':
+        spellName = 'SummonerSnowball'
+    elif spell == '순간이동' or spell == '강력 순간이동':
+        spellName = 'SummonerTeleport'
+
+    return data[spellName]['cooldown'][0] if spell != '강력 순간이동' else 240
+
 if __name__ == '__main__':
     #예시 사용
     championId = 5
     print(get_champion_name(championId, 'ko_KR'))
-    print(get_champion_imageURL(championId))
+    print(get_spell_cooltime('순간이동'))

@@ -1,33 +1,13 @@
-from PyQt5.QtCore import QTimer, pyqtSignal, pyqtSlot
-from PyQt5.QtWidgets import QApplication, QLabel, QVBoxLayout, QWidget
-import sys
+import threading
 
-class MyWidget(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.initUI()
+def print_message():
+    print("Hello, World!")
 
-    def initUI(self):
-        self.layout = QVBoxLayout()
-        self.labels = [QLabel("0", self) for _ in range(2)]
-        for label in self.labels:
-            self.layout.addWidget(label)
-        self.setLayout(self.layout)
+# 5초 후에 print_message 함수를 실행하는 타이머를 생성합니다.
+timer = threading.Timer(5, print_message)
 
-        self.timers = [QTimer(self), QTimer(self)]
-        for i, timer in enumerate(self.timers):
-            increment = 1 if i == 0 else 2
-            update_func = self.createUpdateFunction(self.labels[i], increment)
-            timer.timeout.connect(update_func)
-            timer.start(1000)  # 1초마다 타이머를 시작합니다.
+# 타이머를 시작합니다.
+timer.start()
 
-    def createUpdateFunction(self, label, increment):
-        def updateLabel():
-            current_number = int(label.text())
-            label.setText(str(current_number + increment))
-        return updateLabel
-
-app = QApplication(sys.argv)
-widget = MyWidget()
-widget.show()
-sys.exit(app.exec_())
+# 필요한 경우 타이머를 중지할 수 있습니다.
+# timer.cancel()

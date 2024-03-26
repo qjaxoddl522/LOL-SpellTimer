@@ -1,3 +1,4 @@
+import pprint
 import requests
 
 #롤 클라이언트의 실시간 게임 데이터를 가져오는 API URL
@@ -23,10 +24,10 @@ if __name__=="__main__":
 
         if response.status_code == 200:
             game_data = response.json()
-            for i in game_data['allPlayers']:
-                print(i)
+            """for i in game_data['allPlayers']:
+                print(i)"""
             #print(game_data['activePlayer']['summonerName'])
-            #print(game_data)
+            pprint.pprint(game_data)
             """
             players = game_data['allPlayers'] #플레이어들의 정보 딕셔너리
             for player in players:

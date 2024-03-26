@@ -1,10 +1,10 @@
-import time
+from pprint import pprint
 
 from PyQt5.QtWidgets import QApplication, QDesktopWidget, QLabel, QHBoxLayout, QVBoxLayout, QWidget, QPushButton
 from PyQt5.QtGui import QPixmap, QPixmapCache, QCursor, QFont, QFontDatabase
 from PyQt5.QtCore import Qt, QUrl, QTimer, QSize, pyqtSignal, pyqtSlot
 from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
-import sys, threading, time
+import sys, threading, time, clipboard
 import RiotAPI, LCUAPI, DataDragon
 api_key = 'RGAPI-73aa5947-c143-402e-87a5-d242fca91837' #Riot API 키
 
@@ -12,9 +12,10 @@ api_key = 'RGAPI-73aa5947-c143-402e-87a5-d242fca91837' #Riot API 키
 
 #5명의 적 플레이어 정보
 #[챔피언, 챔피언ID, 스펠1, 스펠2, 스펠1쿨타임, 스펠2쿨타임, 우주적 통찰력 여부, 쿨감신 여부]
-enemyInfo = [{'champ':None, 'champId':i+1, 'spell1':'점멸', 'spell2':'점화', 'spell1CT':0, 'spell2CT':0, 'timerThread':[None, None],'cosmic':False, 'ionia':False} for i in range(5)]
-enemyInfo[2]['spell2'] = '유체화'
+enemyInfo = [{'champ':'애니', 'champId':i+1, 'spell1':'점멸', 'spell2':'점화', 'spell1CT':0, 'spell2CT':0, 'timerThread':[None, None],'cosmic':False, 'ionia':False} for i in range(5)]
+#enemyInfo[2]['spell2'] = '유체화'
 enemyTeamStart = 0 #블루팀 레드팀 구분용도
+ingameTime = [0, time.time()] #[마지막으로 저장된 게임 시간, 실제 시간(api 호출 간격 시간차 고려를 위함)]
 
 #기본 UI
 class UI(QWidget):
@@ -52,8 +53,8 @@ class UI(QWidget):
     def startGame(self):
         global enemyTeamStart
         if self.time == 3:
-            enemyInfo[2], enemyInfo[3] = enemyInfo[3], enemyInfo[2]
-            self.overlay.signalUI.emit()
+            #enemyInfo[2], enemyInfo[3] = enemyInfo[3], enemyInfo[2]
+            #self.overlay.signalUI.emit()
             threading.Thread(target=self.checkGameData).start()
             self.time = 1
         else:
@@ -65,7 +66,7 @@ class UI(QWidget):
     def checkGameData(self):
         global enemyTeamStart
         gameData = LCUAPI.checkIngame() #인식 못하면 None 반환
-        if gameData != None: #인게임 인식
+        if gameData != None and (gameData['gameData']['gameMode'] in ("CLASSIC", "ARAM")): #인게임 및 협곡 인식
             name, tag = gameData['activePlayer']['summonerName'].split('#')
             participants = RiotAPI.get_info(api_key, name, tag)
             if participants != None: #RiotAPI 게임 인식
@@ -80,15 +81,18 @@ class UI(QWidget):
                 self.label.setText("게임을 찾았습니다!")
                 self.findEnemyInfo(gameData)
                 self.findEnemyRune(name, tag, participants)
-                threading.Thread(target=self.checkGameEnd()).start()
+                self.overlay.signalUI.emit()
                 self.overlay.show()
-                print(*enemyInfo, sep='\n')
+                # print(*enemyInfo, sep='\n')
+                threading.Thread(target=self.checkGameEnd()).start()
 
     #게임이 끝났는지 확인 및 정보 갱신
     def checkGameEnd(self):
         while True:
             gameData = LCUAPI.checkIngame()
             if gameData != None: #인게임 인식
+                global ingameTime
+                ingameTime = [round(gameData['gameData']['gameTime']), time.time()]
                 name, tag = gameData['activePlayer']['summonerName'].split('#')
                 participants = RiotAPI.get_info(api_key, name, tag)
                 if participants != None:  #RiotAPI 게임 인식
@@ -103,7 +107,7 @@ class UI(QWidget):
     def findEnemyInfo(self, gameData):
         global enemyTeamStart
         players = gameData['allPlayers']
-        print(players)
+        #pprint(players)
         for i, enemy in enumerate(players[enemyTeamStart : enemyTeamStart+5]):
             enemyInfo[i]['champ'] = enemy['championName']
             enemyInfo[i]['spell1'] = enemy['summonerSpells']['summonerSpellOne']['displayName']
@@ -190,8 +194,8 @@ class OverlayUI(QWidget):
         self.initUI()
         self.signalUI.connect(self.refreshUI)
 
-        self.signalUI.emit()
-        self.show()
+        #self.signalUI.emit()
+        #self.show()
 
     #UI 초기 생성
     def initUI(self):
@@ -296,6 +300,8 @@ class OverlayUI(QWidget):
             btn.setStyleSheet("QPushButton {{border-image: url(spell/{0});}}".format(enemyInfo[player]['spell' + spellNum]))
             enemyInfo[player]['spell'+spellNum+'CT'] = 0
             btn.setText('')
+        #클립보드 갱신
+        self.refreshClipboard()
 
     # 타이머 작동
     # 챔피언 id를 받는 이유는 타이머가 작동할 때 챔피언 순서가 바뀌었는지 확인하기 위함
@@ -320,6 +326,22 @@ class OverlayUI(QWidget):
             btn = getattr(self, 'buttonSpell' + str(spellNum))[player]
             btn.setStyleSheet("QPushButton {{border-image: url(spell/{0});}}".format(enemyInfo[player]['spell' + spellNum]))
             btn.setText('')
+            self.refreshClipboard()
+
+    def refreshClipboard(self):
+        spellClip = ''
+        for enemy in enemyInfo:
+            flag = False
+            tempClip = enemy['champ']+' '
+            for i in ('1', '2'):
+                if enemy['spell'+i+'CT'] > 0:
+                    # 스펠 시간을 초단위로 나타냄
+                    second = ingameTime[0] + enemy['spell'+i+'CT'] + (time.time() - ingameTime[1])
+                    tempClip += "{0}{1}:{2:02d} ".format(enemy['spell'+i], int(second//60), int(second%60))
+                    flag = True
+            if flag is True: #스펠 쿨타임이 붙음
+                spellClip += tempClip
+        clipboard.copy(spellClip)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:

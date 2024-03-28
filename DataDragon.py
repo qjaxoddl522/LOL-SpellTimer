@@ -1,4 +1,5 @@
 import requests
+import hgtk
 
 def get_latest_version():
     url = "https://ddragon.leagueoflegends.com/api/versions.json"
@@ -15,16 +16,16 @@ def get_champion_name(championId, language): #ko_KR 또는 en_US
 
     for champion in champions.values():
         if int(champion['key']) == championId:
-            return champion['name']
+            return champion['id'] if language != 'ko_KR' else champion['name'] #영어는 id, 한글은 name 리턴
     return None
 
 def get_champion_imageURL(championId):
     version = get_latest_version()
-    championName = get_champion_name(championId, 'en_US').replace(' ', '')
+    championName = get_champion_name(championId, 'en_US')
     url = f"https://ddragon.leagueoflegends.com/cdn/{version}/img/champion/{championName}.png"
     return url
 
-def get_spell_cooltime(spell):
+def get_spell_cooltime(spell, level):
     version = get_latest_version()
     url = f"https://ddragon.leagueoflegends.com/cdn/{version}/data/en_US/summoner.json"
     response = requests.get(url)
@@ -54,7 +55,7 @@ def get_spell_cooltime(spell):
     elif spell == '순간이동' or spell == '강력 순간이동':
         spellName = 'SummonerTeleport'
 
-    return data[spellName]['cooldown'][0] if spell != '강력 순간이동' else 240
+    return data[spellName]['cooldown'][0] if spell != '강력 순간이동' else 330-(level-1)*10
 
 if __name__ == '__main__':
     #예시 사용

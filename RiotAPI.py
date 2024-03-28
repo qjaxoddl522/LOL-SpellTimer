@@ -20,7 +20,7 @@ def get_info(api_key, name, tag):
 
 # 사용 예시
 if __name__=="__main__":
-    api_key = 'RGAPI-73aa5947-c143-402e-87a5-d242fca91837' #Riot API 키
+    api_key = 'ABCDE' #Riot API 키
     name = 'DRX' #계정 닉네임
     tag = '6698' #태그
     print(get_info(api_key, name, tag))

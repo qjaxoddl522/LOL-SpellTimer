@@ -7,9 +7,10 @@
     <list default="true" id="f9947948-2bf4-4f77-b193-025b8ea3b273" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/DataDragon.py" beforeDir="false" afterPath="$PROJECT_DIR$/DataDragon.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LCUAPI.py" beforeDir="false" afterPath="$PROJECT_DIR$/LCUAPI.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LOL-SpellTimer.zip" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/LOL_SpellTimer.exe" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/LOL_SpellTimer.py" beforeDir="false" afterPath="$PROJECT_DIR$/LOL_SpellTimer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/RiotAPI.py" beforeDir="false" afterPath="$PROJECT_DIR$/RiotAPI.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Temp.py" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

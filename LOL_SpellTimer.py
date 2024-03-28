@@ -63,11 +63,11 @@ class UI(QWidget):
     def checkGameData(self):
         global enemyTeamStart, gameMode
         gameData = LCUAPI.checkIngame() #인식 못하면 None 반환
-        if gameData != None and (gameData['gameData']['gameMode'] in ("CLASSIC", "ARAM")): #인게임 및 협곡 인식
-            gameMode = gameData['gameData']['gameMode']
+        if gameData != None and (gameData['gameData']['gameMode'] in ("CLASSIC", "ARAM")) and gameData['events']['Events']: #인게임 데이터 확인
             name, tag = gameData['activePlayer']['summonerName'].split('#')
             participants = RiotAPI.get_info(api_key, name, tag)
             if participants != None: #RiotAPI 게임 인식
+                gameMode = gameData['gameData']['gameMode']
                 #enemyTeamStart 찾기
                 for participant in participants:
                     if participant['riotId'] == f"{name}#{tag}": #현재 participant가 플레이어
@@ -82,7 +82,7 @@ class UI(QWidget):
                 self.overlay.signalUI.emit()
                 keyboard.add_hotkey('ctrl', self.overlay.pasteSpellText)
                 threading.Thread(target=self.checkGameEnd).start()
-                pprint(enemyInfo)
+                #pprint(enemyInfo)
 
     #게임이 끝났는지 확인 및 정보 갱신
     def checkGameEnd(self):

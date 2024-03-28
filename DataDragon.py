@@ -55,7 +55,7 @@ def get_spell_cooltime(spell, level):
     elif spell == '순간이동' or spell == '강력 순간이동':
         spellName = 'SummonerTeleport'
 
-    return data[spellName]['cooldown'][0] if spell != '강력 순간이동' else 330-(level-1)*10
+    return data[spellName]['cooldown'][0] if spell != '강력 순간이동' else 330-(min(10, level)-1)*10
 
 if __name__ == '__main__':
     #예시 사용

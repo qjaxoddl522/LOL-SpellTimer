@@ -80,9 +80,9 @@ class UI(QWidget):
                 self.findEnemyInfo(gameData)
                 self.findEnemyRune(participants)
                 self.overlay.signalUI.emit()
-                keyboard.add_hotkey('ctrl', self.overlay.pasteSpellText)
+                keyboard.add_hotkey('alt', self.overlay.pasteSpellText)
                 threading.Thread(target=self.checkGameEnd).start()
-                #pprint(enemyInfo)
+                pprint(enemyInfo)
 
     #게임이 끝났는지 확인 및 정보 갱신
     def checkGameEnd(self):
@@ -139,12 +139,26 @@ class UI(QWidget):
                             
             #적 정보 갱신
             for i, enemy in enumerate(players[enemyTeamStart : enemyTeamStart+5]):
-                if enemyInfo[i]['level'] == enemy['level']: #레벨은 UI를 갱신하지 않아도 됨
+                if enemyInfo[i]['level'] != enemy['level']: #레벨은 UI를 갱신하지 않아도 됨
                     enemyInfo[i]['level'] = enemy['level']
-                if enemyInfo[i]['spell1'] != enemy['summonerSpells']['summonerSpellOne']['displayName'] or enemyInfo[i]['spell2'] != enemy['summonerSpells']['summonerSpellTwo']['displayName']:
-                    enemyInfo[i]['spell1'] = enemy['summonerSpells']['summonerSpellOne']['displayName']
-                    enemyInfo[i]['spell2'] = enemy['summonerSpells']['summonerSpellTwo']['displayName']
-                    flag = True
+
+                for dataSpellNum, infoSpellNum in zip(('summonerSpellOne', 'summonerSpellTwo'), ('spell1', 'spell2')):
+                    #'강타'가 포함된 스펠(원시의 강타 등)들을 모두 '강타'로 취급
+                    if '강타' in enemy['summonerSpells'][dataSpellNum]['displayName']:
+                        enemy['summonerSpells'][dataSpellNum]['displayName'] = '강타'
+                    #'마법공학 점멸'을 점멸로 취급
+                    if '점멸' in enemy['summonerSpells'][dataSpellNum]['displayName']:
+                        enemy['summonerSpells'][dataSpellNum]['displayName'] = '점멸'
+                    #날아갈 수 있는 상태의 표식은 공백으로 표시되므로 이전 스펠 그대로 적용
+                    if enemy['summonerSpells'][dataSpellNum]['displayName'] == '':
+                        enemy['summonerSpells'][dataSpellNum]['displayName'] = enemyInfo[i][infoSpellNum]
+
+                    #이외의 변화한 스펠은 반영
+                    #print(enemyInfo[i][infoSpellNum], enemy['summonerSpells'][dataSpellNum]['displayName'])
+                    if enemyInfo[i][infoSpellNum] != enemy['summonerSpells'][dataSpellNum]['displayName']:
+                        enemyInfo[i][infoSpellNum] = enemy['summonerSpells'][dataSpellNum]['displayName']
+                        flag = True
+
                 for item in enemy['items']:
                     if item['itemID'] == 3158: #쿨감신
                         if not enemyInfo[i]['ionia']:

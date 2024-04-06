@@ -48,7 +48,7 @@ def get_spell_cooltime(spell, level):
         spellName = 'SummonerHeal'
     elif spell == '총명':
         spellName = 'SummonerMana'
-    elif spell == '강타':
+    elif spell == '강타' or spell == '강력 강타' or spell == '원시의 강타':
         spellName = 'SummonerSmite'
     elif spell == '표식':
         spellName = 'SummonerSnowball'
@@ -61,4 +61,4 @@ if __name__ == '__main__':
     #예시 사용
     championId = 5
     print(get_champion_name(championId, 'ko_KR'))
-    print(get_spell_cooltime('순간이동'))
+    print(get_spell_cooltime('강력 순간이동', 11))
